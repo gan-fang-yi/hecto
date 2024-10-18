@@ -1,7 +1,6 @@
 use std::io::{stdout, Error, Write};
 use crossterm::cursor::{Hide, MoveTo, Show};
 use crossterm::{queue, Command};
-use core::fmt::Display;
 use crossterm::style::Print;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType, size};
 
@@ -89,12 +88,12 @@ impl Terminal {
         Ok(Size { height, width })
     }
 
-    pub fn print<T: Display>(string: T) -> Result<(), Error> {
+    pub fn print(string: &str) -> Result<(), Error> {
         Self::queue_command(Print(string))?;
         Ok(())
     }
 
-    fn queue_command<T: Command>(command: T) -> Result<(), Error> {
+    fn queue_command(command: impl Command) -> Result<(), Error> {
         queue!(stdout(), command)?;
         Ok(())
     }

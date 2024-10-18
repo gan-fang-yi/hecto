@@ -1,6 +1,6 @@
-use crossterm::event::{read, Event::Key, KeyCode::Char, KeyEvent, KeyModifiers, Event};
+use crossterm::event::{read, Event::{self, Key}, KeyCode::Char, KeyEvent, KeyEventKind, KeyModifiers};
 use std::io::Error;
-
+use crossterm::event::KeyCode;
 mod terminal;
 use terminal::{Terminal, Position, Size};
 
@@ -27,13 +27,15 @@ impl Editor {
         let Size { height, ..} = Terminal::size()?;
         for current_row in 0..height {
             Terminal::clear_line()?;
+
+            #[allow(clippy::integer_division)]
             if current_row == height / 3 {
                 Self::draw_welcome_message()?;
             } else {
                 Self::draw_empty_row()?;
             }
 
-            if current_row + 1 < height {
+            if current_row.saturating_add(1) < height {
                 Terminal::print("\r\n")?;
             }
         }
@@ -43,11 +45,14 @@ impl Editor {
 
     fn draw_welcome_message() -> Result<(), Error> {
         let mut welcome_message = format!("{NAME} editor -- version {VERSION}");
-        let width = Terminal::size()?.width as usize;
+        let width = Terminal::size()?.width;
         let len = welcome_message.len();
-        let padding = (width - len) / 2;
+        
+        #[allow(clippy::integer_division)]
+        let padding = (width.saturating_sub(len)) / 2;
+
         // omit some spaces for ~
-        let space = " ".repeat(padding - 1);
+        let space = " ".repeat(padding.saturating_sub(1));
         welcome_message = format!("~{space}{welcome_message}");
         welcome_message.truncate(width);
         Terminal::print(welcome_message)?;
@@ -61,6 +66,8 @@ impl Editor {
 
 
     fn repl(&mut self) -> Result<(), std::io::Error> {
+        Self::draw_rows()?;
+        Terminal::move_cursor_to(Position {x: 0, y: 0})?;
         loop {
             self.refresh_screen()?;
             if self.should_quit {
@@ -73,9 +80,13 @@ impl Editor {
     }
 
     fn evalute_event(&mut self, event: &Event) {
-        if let Key(KeyEvent { code, modifiers, ..}) = event {
+        if let Key(KeyEvent { code, modifiers, kind: KeyEventKind::Press, ..}) = event {
             match code {
                 Char('x') if *modifiers == KeyModifiers::CONTROL => self.should_quit = true,
+                KeyCode::Right => Terminal::move_cursor_to_right().unwrap(),
+                KeyCode::Left => Terminal::move_cursor_to_left().unwrap(),
+                KeyCode::Down => Terminal::move_cursor_to_down().unwrap(),
+                KeyCode::Up => Terminal::move_cursor_to_up().unwrap(),
                 _ => (),
             }
         }
@@ -85,11 +96,9 @@ impl Editor {
         Terminal::hide_cursor()?;
         if self.should_quit {
             Terminal::clear_screen()?;
-            Terminal::print("Goodbye.\r\n")?;
-        } else {
-            Self::draw_rows()?;
             Terminal::move_cursor_to(Position {x: 0, y: 0})?;
-        }
+            Terminal::print("Goodbye.\r\n")?;
+        } 
         Terminal::show_cursor()?;
         Terminal::execute()?;
 

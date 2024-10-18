@@ -1,5 +1,5 @@
 use std::io::{stdout, Error, Write};
-use crossterm::cursor::{Hide, MoveTo, Show};
+use crossterm::cursor::{Hide, MoveDown, MoveLeft, MoveRight, MoveTo, MoveUp, Show};
 use crossterm::{queue, Command};
 use core::fmt::Display;
 use crossterm::style::Print;
@@ -7,16 +7,23 @@ use crossterm::terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType, s
 
 #[derive(Clone, Copy)]
 pub struct Size {
-    pub height: u16,
-    pub width: u16,
+    pub height: usize,
+    pub width: usize,
 }
 
 #[derive(Clone, Copy)]
 pub struct Position {
-    pub x: u16,
-    pub y: u16,
+    pub x: usize,
+    pub y: usize,
 }
 
+
+/// Represents the terminal
+/// Edge Case for platform where `usize` < `u16`:
+/// Regardless of the actual size of the Terminal, this presentation only
+/// spans over at most `usize::Max` or `u16::Max` rows and columns, whichever is samller.
+/// Each size returned truncates to min(`usize::Max`, `u16::Max`) rows and columns.
+/// And should you attempt to set the cursor out of these bounds, it will also be truncated.
 pub struct Terminal {}
 
 impl Terminal {
@@ -43,8 +50,32 @@ impl Terminal {
         Ok(())
     }
 
+    /// Move the cursor to the specified position
+    /// # Arguments
+    /// * `position` - The position to move the cursor to. Will be truncated to `u16::MAX` if bigger.
     pub fn move_cursor_to(position: Position) -> Result<(), Error> {
-        Self::queue_command(MoveTo(position.x, position.y))?;
+        #[allow(clippy::as_conversions, clippy::cast_possible_truncation)]
+        Self::queue_command(MoveTo(position.x as u16, position.y as u16))?;
+        Ok(())
+    }
+
+    pub fn move_cursor_to_right() -> Result<(), Error> {
+        Self::queue_command(MoveRight(1))?;
+        Ok(())
+    }
+
+    pub fn move_cursor_to_left() -> Result<(), Error> {
+        Self::queue_command(MoveLeft(1))?;
+        Ok(())
+    }
+
+    pub fn move_cursor_to_down() -> Result<(), Error> {
+        Self::queue_command(MoveDown(1))?;
+        Ok(())
+    }
+
+    pub fn move_cursor_to_up() -> Result<(), Error> {
+        Self::queue_command(MoveUp(1))?;
         Ok(())
     }
 
@@ -63,8 +94,18 @@ impl Terminal {
         Ok(())
     }
 
+    /// Returns the size of the terminal
+    /// Edge Case for platform where `usize` < `u16`:
+    /// * A `Size` representing the terminal size. Any coordinate `z` truncated to `usize` if `usize` < `u16`.
     pub fn size() -> Result<Size, Error> {
         let (width, height) = size()?;
+        
+        #[allow(clippy::as_conversions)]
+        let width = width as usize;
+
+        #[allow(clippy::as_conversions)]
+        let height = height as usize;
+
         Ok(Size { height, width })
     }
 
